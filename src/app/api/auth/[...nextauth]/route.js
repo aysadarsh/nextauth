@@ -4,9 +4,10 @@ import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "../../../lib/prisma";
+import { compare } from "bcrypt";
 
 export const authOptions = {
-    adaptor:PrismaAdapter(prisma),
+    adaptor: PrismaAdapter(prisma),
     providers: [
         CredentialsProvider({
             // The name to display on the sign in form (e.g. 'Sign in with...')
@@ -16,32 +17,29 @@ export const authOptions = {
             // e.g. domain, username, password, 2FA token, etc.
             // You can pass any HTML attribute to the <input> tag through the object.
             credentials: {
-              username: { label: "Username", type: "text", placeholder: "jsmith" },
-              password: { label: "Password", type: "password" }
+                username: { label: "Email", type: "text", placeholder: "one@email.com" },
+                password: { label: "Password", type: "password" }
             },
             async authorize(credentials, req) {
-              // You need to provide your own logic here that takes the credentials
-              // submitted and returns either a object representing a user or value
-              // that is false/null if the credentials are invalid.
-              // e.g. return { id: 1, name: 'J Smith', email: 'jsmith@example.com' }
-              // You can also use the `req` object to obtain additional parameters
-              // (i.e., the request IP address)
-                console.log(credentials,'dasdas');
-              const res = await fetch("/your/endpoint", {
-                method: 'POST',
-                body: JSON.stringify(credentials),
-                headers: { "Content-Type": "application/json" }
-              })
-              const user = await res.json()
-        
-              // If no error and we have user data, return it
-              if (res.ok && user) {
+                const { email, password } = credentials ?? {}
+                if (!email || !password) {
+                    throw new Error("Mising username or password");
+                }
+
+                const user = await prisma.user.findUnique({
+                    where: {
+                        email,
+                    }
+                })
+
+                if (!user || !(await compare(password, user.password))) {
+                    throw new Error("Invalid username or password");
+                }
+
                 return user
-              }
-              // Return null if user data could not be retrieved
-              return null
+
             }
-          })
+        })
     ],
     secret: process.env.NEXTAUTH_SECRET,
     session: {
@@ -52,18 +50,20 @@ export const authOptions = {
         //     return randomUUID?.() ?? randomBytes(32).toString("hex")
         // }
     },
-    jwt:{
-        maxAge: 60 * 60 * 24 *30,
+    jwt: {
+        maxAge: 60 * 60 * 24 * 30,
     },
     pages: {
         signIn: '/auth/signin',
         signOut: '/auth/signout',
-        error: '/auth/error', // Error code passed in query string as ?error=
+        // error: '/auth/error', // Error code passed in query string as ?error=
         verifyRequest: '/auth/verify-request', // (used for check email message)
         newUser: '/auth/new-user' // New users will be directed here on first sign in (leave the property out if not of interest)
     },
     callbacks: {
         async signIn({ user, account, profile, email, credentials }) {
+            // console.log('sign IN');
+            // redirect('/dashboard');
             return true
         },
         async redirect({ url, baseUrl }) {
