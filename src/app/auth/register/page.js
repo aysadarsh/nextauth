@@ -1,11 +1,18 @@
 "use client";
 
-import { signIn } from "next-auth/react"
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 export default function Login() {
 
+    const route = useRouter();
+
+    const [error,setError] = useState(null);
+
     async function register(e) {
         e.preventDefault();
+
+        setError(null);
 
         const formData = Object.fromEntries(await new FormData(e.currentTarget));
 
@@ -14,9 +21,22 @@ export default function Login() {
             body: JSON.stringify(formData),
             headers: { "Content-Type": "application/json" }
         })
+        
+        
+        // console.log( await res.json(), 'response')
 
-        if (res.ok && user) {
-            redirect('/dashboard');
+        if (res.ok) {
+
+            let user = await res.json();
+            
+            route.refresh();
+            route.push("/dashboard");
+        }
+
+        if(res.ok === false)
+        {
+            let err = await res.json();
+            setError(err.error);
         }
 
     }
@@ -25,6 +45,7 @@ export default function Login() {
         <div className="min-h-screen flex items-center justify-center">
             <div className="shadow-lg p-4 px-6">
                 <div className="text-2xl text-semibold mb-4">Register</div>
+                {error !== null && <div className="text-red-500 p-2 px-0 rounded-md mb-4 text-sm">{error}</div>}
                 <form onSubmit={register} method="POST">
                     <label className="block mb-1">Name</label>
                     <div className="mb-4">
